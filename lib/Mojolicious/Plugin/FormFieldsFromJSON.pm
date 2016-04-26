@@ -252,6 +252,8 @@ sub register {
                     }
                 }
 
+								$field->{translate_options} = 1 if ($field->{type} eq "select" && $config->{translate_options});
+
                 if (( $field->{translate_options} || $field->{translate_sublabels}) && 
 											$config->{translation_method} && !$field->{translation_method} ) {
                     $field->{translation_method} = $config->{translation_method};
