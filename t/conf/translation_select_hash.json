@@ -1,0 +1,12 @@
+[
+	{
+			"label" : "Status",
+			"type" : "select",
+			"name" : "status",
+			"translate_options" : "1",
+			"data" : {
+				"1" : "active",
+				"0" : "inactive"
+			}
+	}
+]

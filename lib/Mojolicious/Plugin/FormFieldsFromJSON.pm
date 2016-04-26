@@ -275,7 +275,10 @@ sub register {
                     }
                 }
 
-                if ( $field->{translate_sublabels} && $config->{translation_method} && !$field->{translation_method} ) {
+								$field->{translate_options} = 1 if ($field->{type} eq "select" && $config->{translate_options});
+
+                if (( $field->{translate_options} || $field->{translate_sublabels}) && 
+											$config->{translation_method} && !$field->{translation_method} ) {
                     $field->{translation_method} = $config->{translation_method};
                 }
 
@@ -340,7 +343,7 @@ sub _select {
 
     my $name   = $field->{name} // $field->{label} // '';
 
-    my $field_params = $params{$name} || {},
+    my $field_params = $params{$name} || {};
 
     my %select_params = (
        disabled => $self->_get_highlighted_values( $field, 'disabled' ),
@@ -368,6 +371,11 @@ sub _select {
     if ( $field_params->{data} ) {
         $select_params{data} = $field_params->{data};
     }
+
+		if(ref $field->{translation_method} eq "CODE"){
+			$select_params{translation_method} = $field->{translation_method};
+			$select_params{translate_options} = $field->{translate_options} // 0;
+		}
 
     my @values = $self->_get_select_values( $c, $field, %select_params );
     my $id     = $field->{id} // $name;
@@ -441,6 +449,9 @@ sub _transform_hash_values {
     my $counter = 0;
     my %mapping;
 
+		my $loc = $params{translation_method};
+		my $do_translation = $params{translate_options} // 0;
+
     KEY:
     for my $key ( keys %{ $data } ) {
         if ( ref $data->{$key} ) {
@@ -455,7 +466,9 @@ sub _transform_hash_values {
             $opts{selected} = $selected_value if $params{selected}->{$key};
             #$opts{selected} = undef if $params{selected}->{$key};
 
-            $values[$counter] = [ $data->{$key} => $key, %opts ];
+						my $label = $do_translation? $loc->($self, $data->{$key}) : $data->{$key};
+
+            $values[$counter] = [ $label => $key, %opts ];
             $mapping{$key}    = $counter;
         }
 
@@ -483,6 +496,9 @@ sub _transform_array_values {
     my @values;
     my $numeric = 1;
 
+		my $loc = $params{translation_method};
+		my $do_translation = $params{translate_options} // 0;
+
     for my $value ( @{ $data } ) {
         if ( $numeric && $value =~ m{[^0-9]} ) {
             $numeric = 0;
@@ -494,7 +510,9 @@ sub _transform_array_values {
         $opts{selected} = $selected_value if $params{selected}->{$value};
         #$opts{selected} = undef if $params{selected}->{$value};
 
-        push @values, [ $value => $value, %opts ];
+				my $label = $do_translation? $loc->($self, $value) : $value;
+
+        push @values, [ $label => $value, %opts ];
     }
 
     @values = $numeric ?
