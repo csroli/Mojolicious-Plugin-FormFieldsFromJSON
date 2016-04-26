@@ -1,0 +1,12 @@
+ [
+    {
+        "label" : "Status",
+        "type" : "select",
+        "name" : "status",
+				"data" : [
+					"active",
+					"inactive"
+				]
+    } 
+]
+

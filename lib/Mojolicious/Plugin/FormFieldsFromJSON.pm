@@ -345,9 +345,12 @@ sub _select {
 
     my $field_params = $params{$name} || {};
 
+		# when data value is scalar it must be the selected option
+		my $override_selected = ref $field_params->{data} ? {} : {selected => $field_params->{data}};
+
     my %select_params = (
        disabled => $self->_get_highlighted_values( $field, 'disabled' ),
-       selected => $self->_get_highlighted_values( $field, 'selected' ),
+       selected => $self->_get_highlighted_values( {%$field, %$override_selected}, 'selected' ),
     );
 
     my $stash_values = $c->every_param( $name );
@@ -368,7 +371,7 @@ sub _select {
         }
     }
 
-    if ( $field_params->{data} ) {
+    if (ref $field_params->{data} ) {
         $select_params{data} = $field_params->{data};
     }
 
