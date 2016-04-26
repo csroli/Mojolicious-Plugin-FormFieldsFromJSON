@@ -409,7 +409,7 @@ sub _get_select_values {
 
     my @values;
     if ( 'ARRAY' eq ref $data ) {
-        @values = $self->_transform_array_values( $data, %params );
+        @values = $self->_transform_array_values( $c, $data, %params );
     }
     elsif( 'HASH' eq ref $data ) {
         @values = $self->_transform_hash_values( $c, $data, %params );
@@ -443,7 +443,7 @@ sub _transform_hash_values {
             $opts{selected} = $selected_value if $params{selected}->{$key};
             #$opts{selected} = undef if $params{selected}->{$key};
 
-						my $label = $do_translation? $loc->($self, $data->{$key}) : $data->{$key};
+						my $label = $do_translation? $loc->($c, $data->{$key}) : $data->{$key};
 
             $values[$counter] = [ $label => $key, %opts ];
             $mapping{$key}    = $counter;
@@ -468,7 +468,7 @@ sub _transform_hash_values {
 }
 
 sub _transform_array_values {
-    my ($self, $data, %params) = @_;
+    my ($self, $c, $data, %params) = @_;
 
     my @values;
     my $numeric = 1;
@@ -487,7 +487,7 @@ sub _transform_array_values {
         $opts{selected} = $selected_value if $params{selected}->{$value};
         #$opts{selected} = undef if $params{selected}->{$value};
 
-				my $label = $do_translation? $loc->($self, $value) : $value;
+				my $label = $do_translation? $loc->($c, $value) : $value;
 
         push @values, [ $label => $value, %opts ];
     }
