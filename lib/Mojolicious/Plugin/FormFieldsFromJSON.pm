@@ -424,6 +424,9 @@ sub _transform_hash_values {
     my $counter = 0;
     my %mapping;
 
+		my $loc = $params{translation_method};
+		my $do_translation = $params{translate_options} // 0;
+
     KEY:
     for my $key ( keys %{ $data } ) {
         if ( ref $data->{$key} ) {
@@ -438,7 +441,9 @@ sub _transform_hash_values {
             $opts{selected} = $selected_value if $params{selected}->{$key};
             #$opts{selected} = undef if $params{selected}->{$key};
 
-            $values[$counter] = [ $data->{$key} => $key, %opts ];
+						my $label = $do_translation? $loc->($self, $data->{$key}) : $data->{$key};
+
+            $values[$counter] = [ $label => $key, %opts ];
             $mapping{$key}    = $counter;
         }
 

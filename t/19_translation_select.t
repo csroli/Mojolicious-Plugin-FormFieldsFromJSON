@@ -19,9 +19,15 @@ my $config_name = basename __FILE__;
 $config_name    =~ s{\A \d+_ }{}xms;
 $config_name    =~ s{\.t \z }{}xms;
 
-get '/' => sub {
+get '/array' => sub {
   my $c = shift;
-  my ($textfield) = $c->form_fields( $config_name );
+  my ($textfield) = $c->form_fields( $config_name."_array" );
+  $c->render(text => $textfield);
+};
+
+get '/hash' => sub {
+  my $c = shift;
+  my ($textfield) = $c->form_fields( $config_name."_hash" );
   $c->render(text => $textfield);
 };
 
@@ -38,9 +44,13 @@ sub loc {
 my $close = Mojolicious->VERSION >= 5.73 ? '' : " /";
 
 my $t = Test::Mojo->new;
-$t->get_ok('/')
+$t->get_ok('/array')
   ->status_is(200)
   ->content_is(qq~<label for="status">Status:</label><div><select id="status" name="status"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>\n~);
+
+$t->get_ok('/hash')
+  ->status_is(200)
+  ->content_is(qq~<label for="status">Status:</label><div><select id="status" name="status"><option value="0">Inactive</option><option value="1">Active</option></select></div>\n~);
 
 done_testing();
 
