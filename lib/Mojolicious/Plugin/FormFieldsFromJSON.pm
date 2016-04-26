@@ -346,7 +346,8 @@ sub _select {
     my $field_params = $params{$name} || {};
 
 		# when data value is scalar it must be the selected option
-		my $override_selected = ref $field_params->{data} ? {} : {selected => $field_params->{data}};
+		my $data = $field_params->{data};
+		my $override_selected = (ref $data or not defined $data) ? {} : {selected => $data};
 
     my %select_params = (
        disabled => $self->_get_highlighted_values( $field, 'disabled' ),
@@ -371,8 +372,8 @@ sub _select {
         }
     }
 
-    if (ref $field_params->{data} ) {
-        $select_params{data} = $field_params->{data};
+    if (ref $data ) {
+        $select_params{data} = $data;
     }
 
 		if(ref $field->{translation_method} eq "CODE"){
