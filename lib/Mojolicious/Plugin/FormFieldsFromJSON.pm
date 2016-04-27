@@ -102,7 +102,7 @@ sub register {
 
     $app->helper(
         'validate_form_fields' => sub {
-            my ($c, $file) = @_;
+            my ($c, $file, %sub_params) = @_;
   
             return '' if !$file;
   
@@ -197,7 +197,11 @@ sub register {
                 }
             }
 
-            return %errors;
+						if(exists $sub_params{output} and $sub_params{output} eq "original"){
+							return $validation;
+						}else{
+							return %errors;
+						}
         }
     );
   
