@@ -1,0 +1,7 @@
+[
+	{
+    "name" : "choose",
+    "type" : "select",
+    "data" : {"0" : "No", "1" : "Yes" }  }
+
+]

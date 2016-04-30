@@ -421,7 +421,7 @@ sub _select {
 sub _get_highlighted_values {
     my ($self, $field, $key) = @_;
 
-    return +{} if !$field->{$key};
+    return +{} if not defined $field->{$key};
 
     my %highlighted;
 
