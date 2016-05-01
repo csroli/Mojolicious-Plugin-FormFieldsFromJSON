@@ -388,17 +388,17 @@ sub _select {
 
 sub _get_highlighted_values {
     my ($self, $field, $key) = @_;
+    my $key_value = $field->{$key};
 
-    return +{} if not defined $field->{$key};
+    return +{} if not defined $key_value;
 
     my %highlighted;
 
-    if ( !ref $field->{$key} ) {
-        my $value = $field->{$key};
-        $highlighted{$value} = 1;
+    if ( !ref $key_value ) {
+        $highlighted{$key_value} = 1;
     }
-    elsif ( 'ARRAY' eq ref $field->{$key} ) {
-        for my $value ( @{ $field->{$key} } ) {
+    elsif ( 'ARRAY' eq ref $key_value ) {
+        for my $value ( grep defined, @$key_value ) {
             $highlighted{$value} = 1;
         }
     }
