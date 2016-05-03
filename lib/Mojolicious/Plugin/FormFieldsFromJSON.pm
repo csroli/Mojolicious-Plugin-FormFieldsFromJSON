@@ -246,84 +246,91 @@ sub register {
   
             my $field_config = $configs{$file} || $file;
 
-            my @fields;
-  
-            FIELD:
-            for my $field ( @{ $field_config } ) {
-                if ( 'HASH' ne ref $field ) {
-                    $app->log->error( 'Field definition must be an HASH - skipping field' );
-                    next FIELD;
-                }
-  
-                my $type      = lc $field->{type};
-                my $orig_type = $type;
-
-                if ( $config->{alias} && $config->{alias}->{$type} ) {
-                    $type = $config->{alias}->{$type};
-                }
-  
-                if ( !$valid_types{$type} ) {
-                    $app->log->warn( "Invalid field type $type - falling back to 'text'" );
-                    $type = 'text';
-                }
-
-                if ( $config->{global_attributes} && $type ne 'hidden' && 'HASH' eq ref $config->{global_attributes} ) {
-
-                    ATTRIBUTE:
-                    for my $attribute ( keys %{ $config->{global_attributes} } ) {
-                        $field->{attributes}->{$attribute} //= '';
-
-                        my $field_attr  = $field->{attributes}->{$attribute};
-                        my $global_attr = $config->{global_attributes}->{$attribute};
-
-                        next ATTRIBUTE if $field_attr =~ m{\Q$global_attr};
-
-                        my $space = length $field_attr ? ' ' : '';
-
-                        $field->{attributes}->{$attribute}  .= $space . $global_attr;
-                    }
-                }
-
-								$field->{translate_options} = 1 if ($field->{type} eq "select" && $config->{translate_options});
-
-                if (( $field->{translate_options} || $field->{translate_sublabels}) && 
-											$config->{translation_method} && !$field->{translation_method} ) {
-                    $field->{translation_method} = $config->{translation_method};
-                }
-
-                my $sub        = $self->can( '_' . $type );
-                my $form_field = $self->$sub( $c, $field, %params );
-
-                $form_field = Mojo::ByteStream->new( $form_field );
-
-                my $template = $field->{template} // $config->{templates}->{$orig_type} // $config->{template};
-                if ( $template && $type ne 'hidden' ) {
-                    my $label = $field->{label} // '';
-                    my $loc   = $config->{translation_method};
-
-                    if ( $config->{translate_labels} && $loc && 'CODE' eq ref $loc ) {
-                        $label = $loc->($c, $label);
-                    }
-
-                    $form_field = Mojo::ByteStream->new(
-                        $c->render_to_string(
-                            inline  => $template,
-                            id      => $field->{id} // $field->{name} // $field->{label} // '',
-                            label   => $label,
-                            field   => $form_field,
-                            message => $field->{msg}  // '',
-                            info    => $field->{info} // '',
-                        )
-                    );
-                }
-
-                push @fields, $form_field;
-            }
+						my @fields = @{$self->{render_fields}($c, $field_config, %params)};	
 
             return Mojo::ByteStream->new( join "\n\n", @fields );
         }
     );
+
+		$self->{render_fields} = sub  {
+			my ($c,$field_config, %params) = @_;
+			my @fields;
+
+			FIELD:
+			for my $field ( @{ $field_config } ) {
+					if ( 'HASH' ne ref $field ) {
+							$app->log->error( 'Field definition must be an HASH - skipping field' );
+							next FIELD;
+					}
+
+					my $type      = lc $field->{type};
+					my $orig_type = $type;
+
+					if ( $config->{alias} && $config->{alias}->{$type} ) {
+							$type = $config->{alias}->{$type};
+					}
+
+					if ( !$valid_types{$type} ) {
+							$app->log->warn( "Invalid field type $type - falling back to 'text'" );
+							$type = 'text';
+					}
+
+					if ( $config->{global_attributes} && $type ne 'hidden' && 'HASH' eq ref $config->{global_attributes} ) {
+
+							ATTRIBUTE:
+							for my $attribute ( keys %{ $config->{global_attributes} } ) {
+									$field->{attributes}->{$attribute} //= '';
+
+									my $field_attr  = $field->{attributes}->{$attribute};
+									my $global_attr = $config->{global_attributes}->{$attribute};
+
+									next ATTRIBUTE if $field_attr =~ m{\Q$global_attr};
+
+									my $space = length $field_attr ? ' ' : '';
+
+									$field->{attributes}->{$attribute}  .= $space . $global_attr;
+							}
+					}
+
+					$field->{translate_options} = 1 if ($field->{type} eq "select" && $config->{translate_options});
+
+					if (( $field->{translate_options} || $field->{translate_sublabels}) && 
+								$config->{translation_method} && !$field->{translation_method} ) {
+							$field->{translation_method} = $config->{translation_method};
+					}
+
+					my $sub        = $self->can( '_' . $type );
+					my $form_field = $self->$sub( $c, $field, %params );
+
+					$form_field = Mojo::ByteStream->new( $form_field );
+
+					my $template = $field->{template} // $config->{templates}->{$orig_type} // $config->{template};
+					if ( $template && $type ne 'hidden' ) {
+							my $label = $field->{label} // '';
+							my $loc   = $config->{translation_method};
+
+							if ( $config->{translate_labels} && $loc && 'CODE' eq ref $loc ) {
+									$label = $loc->($c, $label);
+							}
+
+							$form_field = Mojo::ByteStream->new(
+									$c->render_to_string(
+											inline  => $template,
+											id      => $field->{id} // $field->{name} // $field->{label} // '',
+											label   => $label,
+											field   => $form_field,
+											message => $field->{msg}  // '',
+											info    => $field->{info} // '',
+									)
+							);
+					}
+
+					push @fields, $form_field;
+			}
+			return \@fields;
+		};
 }
+
 
 sub _hidden {
     my ($self, $c, $field, %params) = @_;
