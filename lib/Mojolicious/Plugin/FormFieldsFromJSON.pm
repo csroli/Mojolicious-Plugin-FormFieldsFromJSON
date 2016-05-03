@@ -103,7 +103,7 @@ sub register {
             my $params_hash = $c->req->params->to_hash;
             my @param_names = keys %{ $params_hash || {} };
 
-            my %params = map{ $_ => $c->every_param( $_ ) }@param_names;
+            my %params = map{my $params = $c->every_param( $_ ); $_ => $#{$params}>0?$params:$params->[0] }@param_names;
             $validation->input( \%params );
 
             my %errors;
