@@ -460,7 +460,11 @@ sub _get_select_values {
 
     my @values;
     if ( 'ARRAY' eq ref $data ) {
+			if($#{$data} >= 0 and 'HASH' eq ref $data->[0]){
+        @values = $self->_transform_array_of_hashes( $c, $data, %params );
+			}else{
         @values = $self->_transform_array_values( $c, $data, %params );
+			}
     }
     elsif( 'HASH' eq ref $data ) {
         @values = $self->_transform_hash_values( $c, $data, %params );
@@ -508,7 +512,7 @@ sub _transform_hash_values {
     }
 
     my @sorted_keys = $numeric ? 
-        sort { $a <=> $b }keys %mapping :
+        sort { $a <=> $b }keys %mapping : 
         sort { $a cmp $b }keys %mapping;
 
     my @indexes = @mapping{ @sorted_keys };
@@ -516,6 +520,28 @@ sub _transform_hash_values {
     my @sorted_values = @values[ @indexes ];
 
     return @sorted_values;
+}
+
+sub _transform_array_of_hashes {
+    my ($self, $c, $data, %params) = @_;
+
+    my @values;
+
+		my $loc = $params{translation_method};
+		my $do_translation = $params{translate_options} // 0;
+
+    for my $hash ( @{ $data } ) {
+				my ($key, $value) = %$hash;
+        my %opts;
+
+        $opts{disabled} = 'disabled'      if $params{disabled}->{$key};
+        $opts{selected} = $selected_value if $params{selected}->{$key};
+
+				my $label = $do_translation? $loc->($c, $value) : $value;
+
+        push @values, [ $label => $key, %opts ];
+    }
+    return @values;
 }
 
 sub _transform_array_values {
