@@ -42,13 +42,11 @@ sub register {
     );
 		$self->{app} = $app;
 
-
-  
     my %configs;
     if(ref $config->{dir} eq "ARRAY"){
         @{$self->dir} = @{$config->{dir}}; 
     }
-    else{
+    elsif(defined $config->{dir}){
         @{$self->dir} = ($config->{dir});
     }
   
