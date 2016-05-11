@@ -333,6 +333,7 @@ sub render_field {
 			$field->{translation_method} = $self->config->{translation_method};
 	}
 
+	$field->{attributes}{required} = 'required' if $field->{validation}{required};
 	my $sub        = $self->can( '_' . $type );
 	my $form_field = $self->$sub( $c, $field, %params );
 	return Mojo::ByteStream->new( $form_field );
