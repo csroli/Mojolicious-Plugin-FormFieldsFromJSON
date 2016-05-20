@@ -244,7 +244,7 @@ sub register {
                 }
             }
  
-            return if $params{only_load}; 
+            return $configs{$file} if $params{only_load}; 
             return '' if !$configs{$file} && !ref $file;
   
             my $field_config = $configs{$file} || $file;
@@ -410,7 +410,7 @@ sub _select {
 
     if ( $field->{multiple} ) {
         $attrs{multiple} = 'multiple';
-        $attrs{size}     = $field->{size} || 5;
+#        $attrs{size}     = $field->{size} || 5;
     }
 
     my @selected = keys %{ $select_params{selected} };
