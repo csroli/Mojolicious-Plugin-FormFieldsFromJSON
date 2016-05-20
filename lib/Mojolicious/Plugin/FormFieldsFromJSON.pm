@@ -410,7 +410,7 @@ sub _select {
 
     if ( $field->{multiple} ) {
         $attrs{multiple} = 'multiple';
-#        $attrs{size}     = $field->{size} || 5;
+        $attrs{size}     = $field->{size};
     }
 
     my @selected = keys %{ $select_params{selected} };
