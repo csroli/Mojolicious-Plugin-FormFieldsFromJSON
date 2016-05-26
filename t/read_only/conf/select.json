@@ -1,0 +1,11 @@
+ [
+    {
+        "label" : "Done",
+        "type" : "select",
+        "name" : "done",
+        "data" : {
+          "0" : "no",
+          "1" : "yes"
+        }
+    }
+ ]

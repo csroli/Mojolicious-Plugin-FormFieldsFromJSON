@@ -253,7 +253,12 @@ sub register {
 
 						FIELD:
 						for my $field ( @{ $field_config } ) {
-							my $field_html = $self->render_field($c, $field, %params);
+							my $field_html;
+              if($params{read_only}){
+                $field_html = $self->render_static($c, $field, %params);
+              }else{
+                $field_html = $self->render_field($c, $field, %params);
+              }
 							if( defined $field_html){
 								$field_html = $self->apply_template($c, $field_html, $field);
 								push @fields, $field_html;
@@ -290,6 +295,77 @@ sub	apply_template {
 	}
 	return $field_html;
 };
+
+sub render_static {
+	my ($self, $c,$field, %params) = @_;
+  my $value;
+
+	$field->{translate_options} = 1 if ($field->{type} eq "select" && $self->config->{translate_options});
+
+	if (( $field->{translate_options} || $field->{translate_sublabels}) && 
+				$self->config->{translation_method} && !$field->{translation_method} ) {
+			$field->{translation_method} = $self->config->{translation_method};
+	}
+
+  if($field->{type} eq "select"){
+    $value = $self->_static_select($c, $field, \%params);
+  }elsif($field->{type} ne "hidden"){
+    $value = $params{$field->{name}}->{data};
+  }# TODO: other field types 
+  
+  return $value;
+}
+
+# TODO: refactor with _select
+sub _static_select {
+	my ($self, $c,$field, $params) = @_;
+  my %params = ref $params?%$params:();
+
+  my $name  = $field->{name} // $field->{label} // '';
+  my $field_params = $params->{$name} || {};
+
+  # when data value is scalar it must be the selected option
+  my $data = $field_params->{data};
+  my $override_selected = (ref $data or not defined $data) ? {} : {selected => $data};
+
+  my %select_params = (
+     selected => $self->_get_highlighted_values( {%$field, %$override_selected}, 'selected' ),
+  );
+
+  my $stash_values = $c->every_param( $name );
+  my $reset;
+  if ( @{ $stash_values || [] } ) {
+      $select_params{selected} = $self->_get_highlighted_values(
+          +{ selected => $stash_values },
+          'selected',
+      );
+
+      $reset = 1;
+  }
+
+  my $hashref = $self->_get_highlighted_values( $field_params, "selected" );
+  if ( keys %{ $hashref } ) {
+      $select_params{"selected"} = $hashref;
+  }
+
+  if (ref $data ) {
+      $select_params{data} = $data;
+  }
+
+  if(ref $field->{translation_method} eq "CODE"){
+    $select_params{translation_method} = $field->{translation_method};
+    $select_params{translate_options} = $field->{translate_options} // 0;
+  }
+  
+  my @values = $self->_get_select_values( $c, $field, %select_params );
+
+  my @result_items = ();
+  for my $option (@values){
+    push @result_items, $option->[0] if $option->[2];
+  }
+
+  return join ", ", @result_items;
+}
 
 sub render_field {
 	my ($self, $c,$field, %params) = @_;
