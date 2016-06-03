@@ -300,6 +300,8 @@ sub render_static {
 	my ($self, $c,$field, %params) = @_;
   my $value;
 
+  $self->merge_global_attributes($field);
+
 	$field->{translate_options} = 1 if ($field->{type} eq "select" && $self->config->{translate_options});
 
 	if (( $field->{translate_options} || $field->{translate_sublabels}) && 
@@ -312,8 +314,12 @@ sub render_static {
   }elsif($field->{type} ne "hidden"){
     $value = $params{$field->{name}}->{data};
   }# TODO: other field types 
-  
-  return $value;
+
+  if($self->config->{static_tag}){
+    return $self->tag(
+  }else{
+    return $value;
+  }
 }
 
 # TODO: refactor with _select
@@ -367,6 +373,26 @@ sub _static_select {
   return join ", ", @result_items;
 }
 
+
+sub merge_global_attributes {
+	my ($self,$field) = @_;
+	if ( $self->config->{global_attributes} && $field->{type} ne 'hidden' && 'HASH' eq ref $self->config->{global_attributes} ) {
+
+			for my $attribute ( keys %{ $self->config->{global_attributes} } ) {
+					$field->{attributes}->{$attribute} //= '';
+
+					my $field_attr  = $field->{attributes}->{$attribute};
+					my $global_attr = $self->config->{global_attributes}->{$attribute};
+
+          # maybe index is faster
+					unless( $field_attr =~ m{\Q$global_attr}){
+            my $space = length $field_attr ? ' ' : '';
+            $field->{attributes}->{$attribute}  .= $space . $global_attr;
+          }
+			}
+	}
+}
+
 sub render_field {
 	my ($self, $c,$field, %params) = @_;
 	if ( 'HASH' ne ref $field ) {
@@ -385,22 +411,7 @@ sub render_field {
 			$type = 'text';
 	}
 
-	if ( $self->config->{global_attributes} && $type ne 'hidden' && 'HASH' eq ref $self->config->{global_attributes} ) {
-
-			ATTRIBUTE:
-			for my $attribute ( keys %{ $self->config->{global_attributes} } ) {
-					$field->{attributes}->{$attribute} //= '';
-
-					my $field_attr  = $field->{attributes}->{$attribute};
-					my $global_attr = $self->config->{global_attributes}->{$attribute};
-
-					next ATTRIBUTE if $field_attr =~ m{\Q$global_attr};
-
-					my $space = length $field_attr ? ' ' : '';
-
-					$field->{attributes}->{$attribute}  .= $space . $global_attr;
-			}
-	}
+  $self->merge_global_attributes($field);
 
 	$field->{translate_options} = 1 if ($field->{type} eq "select" && $self->config->{translate_options});
 
