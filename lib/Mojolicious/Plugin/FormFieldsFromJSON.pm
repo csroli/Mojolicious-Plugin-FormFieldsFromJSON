@@ -316,6 +316,7 @@ sub render_static {
   }elsif($field->{type} ne "hidden"){
     $value = $params{$field->{name}}->{data};
   }# TODO: other field types 
+  $value = Mojo::ByteStream->new("&nbsp;") unless length $value; # TODO: static_empty_placeholder config
 
   if($self->config->{static_tag}){
     return $c->tag($self->config->{static_tag} => %{$field->{attributes}}=> $value, );

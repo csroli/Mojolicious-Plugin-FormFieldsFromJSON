@@ -27,10 +27,20 @@ get '/surround_with_tag' => sub {
   $c->render(text => $textfield);
 };
 
+get '/surround_empty_value' => sub {
+  my $c = shift;
+  my $entity = {
+    "read_only" => "1"
+  };
+  my ($textfield) = $c->form_fields( $config_name, %$entity);
+  $c->render(text => $textfield);
+};
+
 my $close = Mojolicious->VERSION >= 5.73 ? '' : " /";
 
 my $t = Test::Mojo->new;
 $t->get_ok('/surround_with_tag')->status_is(200)->content_is('<span class="number">100</span>');
+$t->get_ok('/surround_empty_value')->status_is(200)->content_is('<span class="number">&nbsp;</span>');
  
 done_testing();
 
