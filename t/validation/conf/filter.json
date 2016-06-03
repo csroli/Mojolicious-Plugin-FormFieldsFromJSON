@@ -1,0 +1,10 @@
+ [
+    {
+        "name" : "name",
+        "type" : "text",
+        "validation" : {
+            "size" : [ 2, 5 ],
+            "filter" : "trim"
+        }
+    }
+ ]
