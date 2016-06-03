@@ -316,7 +316,7 @@ sub render_static {
   }# TODO: other field types 
 
   if($self->config->{static_tag}){
-    return $self->tag(
+    return $c->tag($self->config->{static_tag} => %{$field->{attributes}}=> $value, );
   }else{
     return $value;
   }
