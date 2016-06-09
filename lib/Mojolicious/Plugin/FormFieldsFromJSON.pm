@@ -115,7 +115,10 @@ sub register {
   
             return '' if !$configs{$file};
   
-            my $config = $configs{$file};
+            my $base_config = $configs{$file};
+
+            # flatten composite fields
+            my $config = [map {$_->{type} ne "composite"?$_:@{$_->{parts}}} @{ $base_config }];
 
             my $validation = $c->validation;
 
@@ -134,7 +137,9 @@ sub register {
                     next FIELD;
                 }
 
+                my $name         = $field->{name} // $field->{label} // '';
                 if ( !$field->{validation} ) {
+                    $app->log->info( 'Field "'.$name.'" may be skipped from output' );
                     next FIELD;
                 }
 
@@ -143,11 +148,10 @@ sub register {
                     next FIELD;
                 }
 
-                my $name         = $field->{name} // $field->{label} // '';
                 my $global_error = 1;
 
                 my $filter = $field->{validation}{filter};
-                if ( $field->{validation}->{required} ) {
+                if ( $field->{validation}{required} ) {
                     $validation->required(defined $filter?( $name, $filter):($name));
 
                     my $value  = $field->{validation}->{required};
