@@ -67,6 +67,16 @@ get '/overridden_multi' => sub {
   $c->render(text => $textfield);
 };
 
+get '/field-only/:yn' => sub {
+  my $c = shift;
+  my $entity = {
+    "done" => {selected => $c->param("yn")}
+  };
+  $entity->{done}{read_only} = 1;
+  my ($textfield) = $c->form_fields( $config_name, %$entity);
+  $c->render(text => $textfield);
+};
+
 my $close = Mojolicious->VERSION >= 5.73 ? '' : " /";
 
 my $t = Test::Mojo->new;
@@ -76,6 +86,7 @@ $t->get_ok('/overridden_hash')->status_is(200)->content_is("oh");
 $t->get_ok('/overridden_array')->status_is(200)->content_is("0");
 $t->get_ok('/overridden_aoh')->status_is(200)->content_is("zero");
 $t->get_ok('/overridden_multi')->status_is(200)->content_is("one, zero");
+$t->get_ok('/field-only/1')->status_is(200)->content_is("yes");
 
 
 done_testing();
