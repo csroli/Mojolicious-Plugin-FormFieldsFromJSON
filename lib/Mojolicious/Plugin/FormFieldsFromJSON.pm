@@ -347,7 +347,7 @@ sub render_field {
 	}
 
 	$field->{attributes}{required} = 'required' if $field->{validation}{required};
-	$field->{read_only} = $params{$field->{name}}{read_only} // $params{read_only}; # inherit global property
+	$field->{read_only} = $field->{read_only} || $params{$field->{name}}{read_only} || $params{read_only}; # inherit global property
 	my $sub        = $self->can( '_' . $type );
 	my $form_field = $self->$sub( $c, $field, %params );
 	return Mojo::ByteStream->new( $form_field );
