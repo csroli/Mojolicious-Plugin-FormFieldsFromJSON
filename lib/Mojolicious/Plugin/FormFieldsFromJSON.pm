@@ -347,16 +347,21 @@ sub render_field {
 	}
 
 	$field->{attributes}{required} = 'required' if $field->{validation}{required};
-	$field->{read_only} = $field->{read_only} || $params{$field->{name}}{read_only} || $params{read_only}; # inherit global property
 	my $sub        = $self->can( '_' . $type );
 	my $form_field = $self->$sub( $c, $field, %params );
 	return Mojo::ByteStream->new( $form_field );
 };
 
+#prevent caching of $field->{read_only}
+sub is_read_only {
+  my ($self, $field, $params) = @_;
+  return $field->{read_only} || (exists $params->{$field->{name}}?$params->{$field->{name}}{read_only}:undef) || $params->{read_only};
+}
+
 sub _hidden {
     my ($self, $c, $field, %params) = @_;
   
-    return if $field->{read_only};
+    return if $self->is_read_only($field, \%params);
 
     my $name  = $field->{name} // $field->{label} // '';
     my $value = $params{$name}->{data} // $c->stash( $name ) // $c->param( $name ) // $field->{data} // '';
@@ -383,7 +388,7 @@ sub _text {
     my $value = $params{$name}->{data} // $c->stash( $name ) // $c->param( $name ) // $field->{data} // '';
     my $id    = $field->{id} // $name;
     my %attrs = %{ $field->{attributes} || {} };
-    return $self->serve_static($c,$field, $value) if $field->{read_only};
+    return $self->serve_static($c,$field, $value) if $self->is_read_only($field, \%params);
     return $c->text_field( $name, $value, id => $id, %attrs );
 }
 
@@ -447,7 +452,7 @@ sub _select {
     }
 
     my $select_field;
-    if($field->{read_only}){
+    if($self->is_read_only($field, \%params)){
       my @result_items = ();
       for my $option (@values){
         push @result_items, $option->[0] if $option->[2];
@@ -792,7 +797,7 @@ sub _textarea {
     my $id    = $field->{id} // $name;
     my %attrs = %{ $field->{attributes} || {} };
 
-    return $self->serve_static($c,$field,$value) if $field->{read_only};
+    return $self->serve_static($c,$field,$value) if $self->is_read_only($field, \%params);
     return $c->text_area( $name, $value, id => $id, %attrs );
 }
 
@@ -804,7 +809,7 @@ sub _password {
     my $id    = $field->{id} // $name;
     my %attrs = %{ $field->{attributes} || {} };
 
-    return $self->serve_static($c,$field, undef) if $field->{read_only};
+    return $self->serve_static($c,$field, undef) if $self->is_read_only($field, \%params);
     return $c->password_field( $name, value => $value, id => $id, %attrs );
 }
 
