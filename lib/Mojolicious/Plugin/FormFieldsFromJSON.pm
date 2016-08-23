@@ -392,7 +392,7 @@ sub _select {
 
     my @values = $self->_get_select_values( $c, $field, %select_params );
     my $id     = $field->{id} // $name;
-    my %attrs  = %{ $field->{attributes} || {} };
+    my %attrs  = (%{ $field->{attributes} || {}}, %{$field_params->{attributes} || {} });
 
     if ( $field->{multiple} ) {
         $attrs{multiple} = 'multiple';
