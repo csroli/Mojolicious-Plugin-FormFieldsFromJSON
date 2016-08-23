@@ -1,0 +1,11 @@
+  [
+    {
+      "type" : "select",
+      "name" : "side",
+      "data" :[ 
+				{"": "Choose your side"},
+        {"312" : "Sith"},
+        {"161" : "Jedi"}
+      ]
+    }
+  ]

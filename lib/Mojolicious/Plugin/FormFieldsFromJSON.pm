@@ -5,7 +5,7 @@ use Mojo::Base 'Mojolicious::Plugin';
 
 our $VERSION = '0.32';
 
-use Carp;
+# Mojo::Base already uses Carp
 use File::Basename;
 use File::Spec;
 use IO::Dir;
@@ -19,6 +19,8 @@ use Mojo::JSON qw(decode_json);
 use Mojolicious ();
 
 has dir => sub {["."]} ;
+has config => sub {+{}} ;
+has valid_types => sub {+{}} ;
 
 my $selected_value = Mojolicious->VERSION < 6.16 ? 'selected' : undef;
 my $checked_value  = Mojolicious->VERSION < 6.16 ? 'checked'  : undef;
@@ -27,16 +29,8 @@ sub register {
     my ($self, $app, $config) = @_;
 
     $config //= {};
-  
-    my %configs;
-    if(ref $config->{dir} eq "ARRAY"){
-        @{$self->dir} = @{$config->{dir}}; 
-    }
-    else{
-        @{$self->dir} = ($config->{dir});
-    }
-  
-    my %valid_types = (
+		%{$self->config} = %{$config};
+    %{$self->valid_types} = (
         %{ $config->{types} || {} },
         text     => 1,
         checkbox => 1,
@@ -46,7 +40,16 @@ sub register {
         textarea => 1,
         password => 1,
     );
+		$self->{app} = $app;
 
+    my %configs;
+    if(ref $config->{dir} eq "ARRAY"){
+        @{$self->dir} = @{$config->{dir}}; 
+    }
+    elsif(defined $config->{dir}){
+        @{$self->dir} = ($config->{dir});
+    }
+  
     my %configfiles;
     $app->helper(
         forms => sub {
@@ -112,7 +115,10 @@ sub register {
   
             return '' if !$configs{$file};
   
-            my $config = $configs{$file};
+            my $base_config = $configs{$file};
+
+            # flatten composite fields
+            my $config = [map {$_->{type} ne "composite"?$_:@{$_->{parts}}} @{ $base_config }];
 
             my $validation = $c->validation;
 
@@ -131,7 +137,9 @@ sub register {
                     next FIELD;
                 }
 
+                my $name         = $field->{name} // $field->{label} // '';
                 if ( !$field->{validation} ) {
+                    $app->log->info( 'Field "'.$name.'" may be skipped from output' );
                     next FIELD;
                 }
 
@@ -140,11 +148,11 @@ sub register {
                     next FIELD;
                 }
 
-                my $name         = $field->{name} // $field->{label} // '';
                 my $global_error = 1;
 
-                if ( $field->{validation}->{required} ) {
-                    $validation->required( $name );
+                my $filter = $field->{validation}{filter};
+                if ( $field->{validation}{required} ) {
+                    $validation->required(defined $filter?( $name, $filter):($name));
 
                     my $value  = $field->{validation}->{required};
                     if ( ref $value && 'HASH' eq ref $value ) {
@@ -152,7 +160,7 @@ sub register {
                     }
                 }
                 else {
-                    $validation->optional( $name );
+                    $validation->optional(defined $filter?( $name, $filter):($name));
                 }
 
                 RULE:
@@ -160,6 +168,7 @@ sub register {
                     last RULE if !defined $params{$name};
 
                     next RULE if $rule eq 'required';
+                    next RULE if $rule eq 'filter';
 
                     my $value  = $field->{validation}->{$rule};
                     my $ref    = ref $value;
@@ -241,92 +250,118 @@ sub register {
                 }
             }
  
-            return if $params{only_load}; 
+            return $configs{$file} if $params{only_load}; 
             return '' if !$configs{$file} && !ref $file;
   
             my $field_config = $configs{$file} || $file;
 
-            my @fields;
-  
-            FIELD:
-            for my $field ( @{ $field_config } ) {
-                if ( 'HASH' ne ref $field ) {
-                    $app->log->error( 'Field definition must be an HASH - skipping field' );
-                    next FIELD;
-                }
-  
-                my $type      = lc $field->{type};
-                my $orig_type = $type;
+						my @fields;
 
-                if ( $config->{alias} && $config->{alias}->{$type} ) {
-                    $type = $config->{alias}->{$type};
-                }
-  
-                if ( !$valid_types{$type} ) {
-                    $app->log->warn( "Invalid field type $type - falling back to 'text'" );
-                    $type = 'text';
-                }
-
-                if ( $config->{global_attributes} && $type ne 'hidden' && 'HASH' eq ref $config->{global_attributes} ) {
-
-                    ATTRIBUTE:
-                    for my $attribute ( keys %{ $config->{global_attributes} } ) {
-                        $field->{attributes}->{$attribute} //= '';
-
-                        my $field_attr  = $field->{attributes}->{$attribute};
-                        my $global_attr = $config->{global_attributes}->{$attribute};
-
-                        next ATTRIBUTE if $field_attr =~ m{\Q$global_attr};
-
-                        my $space = length $field_attr ? ' ' : '';
-
-                        $field->{attributes}->{$attribute}  .= $space . $global_attr;
-                    }
-                }
-
-								$field->{translate_options} = 1 if ($field->{type} eq "select" && $config->{translate_options});
-
-                if (( $field->{translate_options} || $field->{translate_sublabels}) && 
-											$config->{translation_method} && !$field->{translation_method} ) {
-                    $field->{translation_method} = $config->{translation_method};
-                }
-
-                my $sub        = $self->can( '_' . $type );
-                my $form_field = $self->$sub( $c, $field, %params );
-
-                $form_field = Mojo::ByteStream->new( $form_field );
-
-                my $template = $field->{template} // $config->{templates}->{$orig_type} // $config->{template};
-                if ( $template && $type ne 'hidden' ) {
-                    my $label = $field->{label} // '';
-                    my $loc   = $config->{translation_method};
-
-                    if ( $config->{translate_labels} && $loc && 'CODE' eq ref $loc ) {
-                        $label = $loc->($c, $label);
-                    }
-
-                    $form_field = Mojo::ByteStream->new(
-                        $c->render_to_string(
-                            inline  => $template,
-                            id      => $field->{id} // $field->{name} // $field->{label} // '',
-                            label   => $label,
-                            field   => $form_field,
-                            message => $field->{msg}  // '',
-                            info    => $field->{info} // '',
-                        )
-                    );
-                }
-
-                push @fields, $form_field;
-            }
-
+						FIELD:
+						for my $field ( @{ $field_config } ) {
+							my $field_html = $self->render_field($c, $field, %params);
+							if( defined $field_html){
+								$field_html = $self->apply_template($c, $field_html, $field);
+								push @fields, $field_html;
+							}
+						}
             return Mojo::ByteStream->new( join "\n\n", @fields );
         }
     );
+
+}
+
+sub	apply_template {
+	my ($self,$c,$field_html, $field) = @_;
+	my $type = lc $field->{type};
+	my $template = $field->{template} // $self->config->{templates}->{$type} // $self->config->{template};
+	if ( $template && $type ne 'hidden' ) {
+			my $label = $field->{label} // '';
+			my $loc   = $self->config->{translation_method};
+
+			if ( $self->config->{translate_labels} && $loc && 'CODE' eq ref $loc ) {
+					$label = $loc->($c, $label);
+			}
+
+			$field_html = Mojo::ByteStream->new(
+					$c->render_to_string(
+							inline  => $template,
+							id      => $field->{id} // $field->{name} // $field->{label} // '',
+							label   => $label,
+							field   => $field_html,
+							message => $field->{msg}  // '',
+							info    => $field->{info} // '',
+					)
+			);
+	}
+	return $field_html;
+};
+
+# TODO: refactor with _select
+
+
+sub merge_global_attributes {
+	my ($self,$field) = @_;
+	if ( $self->config->{global_attributes} && $field->{type} ne 'hidden' && 'HASH' eq ref $self->config->{global_attributes} ) {
+
+			for my $attribute ( keys %{ $self->config->{global_attributes} } ) {
+					$field->{attributes}->{$attribute} //= '';
+
+					my $field_attr  = $field->{attributes}->{$attribute};
+					my $global_attr = $self->config->{global_attributes}->{$attribute};
+
+          # maybe index is faster
+					unless( $field_attr =~ m{\Q$global_attr}){
+            my $space = length $field_attr ? ' ' : '';
+            $field->{attributes}->{$attribute}  .= $space . $global_attr;
+          }
+			}
+	}
+}
+
+sub render_field {
+	my ($self, $c,$field, %params) = @_;
+	if ( 'HASH' ne ref $field ) {
+			$self->{app}->log->error( 'Field definition must be an HASH - skipping field' );
+			return;
+	}
+
+	my $type      = lc $field->{type};
+
+	if ( $self->config->{alias} && $self->config->{alias}->{$type} ) {
+			$type = $self->config->{alias}->{$type};
+	}
+
+	if ( !$self->valid_types->{$type} ) {
+			$self->{app}->log->warn( "Invalid field type $type - falling back to 'text'" );
+			$type = 'text';
+	}
+
+  $self->merge_global_attributes($field);
+
+	$field->{translate_options} = 1 if ($field->{type} eq "select" && $self->config->{translate_options});
+
+	if (( $field->{translate_options} || $field->{translate_sublabels}) && 
+				$self->config->{translation_method} && !$field->{translation_method} ) {
+			$field->{translation_method} = $self->config->{translation_method};
+	}
+
+	$field->{attributes}{required} = 'required' if $field->{validation}{required};
+	my $sub        = $self->can( '_' . $type );
+	my $form_field = $self->$sub( $c, $field, %params );
+	return Mojo::ByteStream->new( $form_field );
+};
+
+#prevent caching of $field->{read_only}
+sub is_read_only {
+  my ($self, $field, $params) = @_;
+  return $field->{read_only} || (exists $params->{$field->{name}}?$params->{$field->{name}}{read_only}:undef) || $params->{read_only};
 }
 
 sub _hidden {
     my ($self, $c, $field, %params) = @_;
+  
+    return if $self->is_read_only($field, \%params);
 
     my $name  = $field->{name} // $field->{label} // '';
     my $value = $params{$name}->{data} // $c->stash( $name ) // $c->param( $name ) // $field->{data} // '';
@@ -336,6 +371,16 @@ sub _hidden {
     return $c->hidden_field( $name, $value, id => $id, %attrs );
 }
 
+sub serve_static {
+  my ($self, $c, $field, $value) = @_;
+  $value = Mojo::ByteStream->new("&nbsp;") unless length $value; # TODO: static_empty_placeholder config
+  if($self->config->{static_tag}){
+    return $c->tag($self->config->{static_tag} => %{$field->{attributes}}=> $value, );
+  }else{
+    return $value;
+  }
+}
+
 sub _text {
     my ($self, $c, $field, %params) = @_;
 
@@ -343,7 +388,7 @@ sub _text {
     my $value = $params{$name}->{data} // $c->stash( $name ) // $c->param( $name ) // $field->{data} // '';
     my $id    = $field->{id} // $name;
     my %attrs = %{ $field->{attributes} || {} };
-
+    return $self->serve_static($c,$field, $value) if $self->is_read_only($field, \%params);
     return $c->text_field( $name, $value, id => $id, %attrs );
 }
 
@@ -396,7 +441,7 @@ sub _select {
 
     if ( $field->{multiple} ) {
         $attrs{multiple} = 'multiple';
-        $attrs{size}     = $field->{size} || 5;
+        $attrs{size}     = $field->{size};
     }
 
     my @selected = keys %{ $select_params{selected} };
@@ -406,7 +451,17 @@ sub _select {
         $c->param( $name, $param );
     }
 
-    my $select_field = $c->select_field( $name, [ @values ], id => $id, %attrs );
+    my $select_field;
+    if($self->is_read_only($field, \%params)){
+      my @result_items = ();
+      for my $option (@values){
+        push @result_items, $option->[0] if $option->[2];
+      }
+
+      $select_field = $self->serve_static($c,$field,join ", ", @result_items);
+    }else{
+      $select_field = $c->select_field( $name, [ @values ], id => $id, %attrs );
+    }
 
     # reset parameters
     if ( $reset ) {
@@ -445,7 +500,11 @@ sub _get_select_values {
 
     my @values;
     if ( 'ARRAY' eq ref $data ) {
+			if($#{$data} >= 0 and 'HASH' eq ref $data->[0]){
+        @values = $self->_transform_array_of_hashes( $c, $data, %params );
+			}else{
         @values = $self->_transform_array_values( $c, $data, %params );
+			}
     }
     elsif( 'HASH' eq ref $data ) {
         @values = $self->_transform_hash_values( $c, $data, %params );
@@ -493,7 +552,7 @@ sub _transform_hash_values {
     }
 
     my @sorted_keys = $numeric ? 
-        sort { $a <=> $b }keys %mapping :
+        sort { $a <=> $b }keys %mapping : 
         sort { $a cmp $b }keys %mapping;
 
     my @indexes = @mapping{ @sorted_keys };
@@ -501,6 +560,28 @@ sub _transform_hash_values {
     my @sorted_values = @values[ @indexes ];
 
     return @sorted_values;
+}
+
+sub _transform_array_of_hashes {
+    my ($self, $c, $data, %params) = @_;
+
+    my @values;
+
+		my $loc = $params{translation_method};
+		my $do_translation = $params{translate_options} // 0;
+
+    for my $hash ( @{ $data } ) {
+				my ($key, $value) = %$hash;
+        my %opts;
+
+        $opts{disabled} = 'disabled'      if $params{disabled}->{$key};
+        $opts{selected} = $selected_value if $params{selected}->{$key};
+
+				my $label = $do_translation? $loc->($c, $value) : $value;
+
+        push @values, [ $label => $key, %opts ];
+    }
+    return @values;
 }
 
 sub _transform_array_values {
@@ -716,6 +797,7 @@ sub _textarea {
     my $id    = $field->{id} // $name;
     my %attrs = %{ $field->{attributes} || {} };
 
+    return $self->serve_static($c,$field,$value) if $self->is_read_only($field, \%params);
     return $c->text_area( $name, $value, id => $id, %attrs );
 }
 
@@ -727,6 +809,7 @@ sub _password {
     my $id    = $field->{id} // $name;
     my %attrs = %{ $field->{attributes} || {} };
 
+    return $self->serve_static($c,$field, undef) if $self->is_read_only($field, \%params);
     return $c->password_field( $name, value => $value, id => $id, %attrs );
 }
 

@@ -1,0 +1,10 @@
+[
+  {
+      "label" : "Fee",
+      "type" : "text",
+      "name" : "fee",
+      "attributes" : {
+        "class" : "number"
+      }
+  }
+]

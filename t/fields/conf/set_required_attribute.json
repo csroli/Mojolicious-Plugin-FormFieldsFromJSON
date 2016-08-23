@@ -1,0 +1,15 @@
+[
+	{
+			"label" : "Name",
+			"type" : "text",
+			"validation" : {
+					"required" : "name"
+			},
+			"name" : "name"
+	},
+	{
+			"label" : "Alias",
+			"type" : "text",
+			"name" : "optional"
+	}
+]
