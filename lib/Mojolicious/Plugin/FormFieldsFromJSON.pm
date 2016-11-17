@@ -103,11 +103,30 @@ sub register {
         }
     );
 
+
+
     $app->helper(
         'validate_form_fields' => sub {
             my ($c, $file, %sub_params) = @_;
   
             return '' if !$file;
+
+            if(ref $file eq "ARRAY"){
+              if(exists $sub_params{output} and $sub_params{output} eq "original"){
+                my $res_val;
+                for my $form_name (@$file){
+                  $res_val = $c->validate_form_fields($form_name, %sub_params); 
+                }
+                return $res_val;
+              }else{
+                my %errors;
+                for my $form_name (@$file){
+                  my %result = $c->validate_form_fields($form_name, %sub_params); 
+                  %errors = (%errors, %result);
+                }
+                return %errors;
+              } 
+            }
   
             if ( !$configs{$file} ) {
                 $c->form_fields( $file, only_load => 1 );
